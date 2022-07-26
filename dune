@@ -1,0 +1,7 @@
+(executables
+ (names main server)
+ (libraries unix)
+ (promote (until-clean)))
+
+(ocamllex (modules commandLexer))
+(ocamlyacc (modules commandParser))
