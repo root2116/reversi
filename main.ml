@@ -28,7 +28,7 @@ let output_color oc color =
   if color = white then (output_string oc "white\n"; flush oc)
   else                  (output_string oc "black\n"; flush oc)
 
-(* コマンドを受け取る *)
+
 let input_command ic =
   let s = input_line ic in
   let report_recv s = print_endline ("Received: " ^ s) in

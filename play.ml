@@ -3,6 +3,18 @@ open Command
 
 
 type board = color array array
+let board_value = 
+  let value_table = Array.make_matrix 10 10 0 in
+    let f = open_in "board_value.txt" in
+    for i=0 to 9 do
+      for j=0 to 9 do
+        let value = input_line f in
+        value_table.(i).(j) <- (int_of_string value)
+      done
+    done;
+    value_table
+
+
 
 let init_board () =
   let board = Array.make_matrix 10 10 none in
@@ -52,14 +64,15 @@ let is_valid_move board color (i,j) =
 
 
 let doMove board com color =
+  let copy = Array.map (fun z -> Array.copy z) board in
   match com with
       GiveUp  -> board
     | Pass    -> board
     | Mv (i,j) ->
 	let ms = flippable_indices board color (i,j) in
-	let _  = List.map (fun (ii,jj) -> board.(ii).(jj) <- color) ms in
-	let _  = board.(i).(j) <- color in
-	  board
+	let _  = List.map (fun (ii,jj) -> copy.(ii).(jj) <- color) ms in
+	let _  = copy.(i).(j) <- color in
+	  copy
 
 let mix xs ys =
   List.concat (List.map (fun x -> List.map (fun y -> (x,y)) ys) xs)
@@ -70,15 +83,52 @@ let valid_moves board color =
   List.filter (is_valid_move board color)
     (mix ls ls)
 
+let eval_board board color = 
+  let ocolor = opposite_color color in
+  let rec eval i sum = 
+    if i = 100 then 
+     sum
+    else 
+      let cl = board.(i/10).(i mod 10) in
+      if cl = color then 
+        eval (i+1) (sum + board_value.(i/10).(i mod 10))
+      else if cl = ocolor then
+        eval (i+1) (sum - board_value.(i/10).(i mod 10))
+      else eval (i+1) sum 
+  in
+    eval 0 0
+
+let argmax xs = 
+  let rec inner_argmax a max_index index max_value =
+    match a with
+    | [] -> max_index
+    | x::xs -> if x > max_value then 
+                 inner_argmax xs index (index+1) x 
+               else 
+                 inner_argmax xs max_index (index+1) max_value
+    
+  in 
+     inner_argmax xs 0 0 (-100000)
+
+let rec print_moves ms =
+  match ms with
+  | [] -> print_newline ()
+  | (i,j)::xs -> print_string "("; print_int i; print_string ","; print_int j; print_string ")"; print_newline (); print_moves xs  
 
 let play board color =
   let ms = valid_moves board color in
+  print_moves ms;
     if ms = [] then
       Pass
     else
-      let k = Random.int (List.length ms) in
-      let (i,j) = List.nth ms k in
+      let next_boards = List.map (fun (i,j) -> doMove board (Mv (i,j)) color) ms in 
+      let next_values = List.map (fun board -> eval_board board color) next_boards in
+      let k = argmax next_values in 
+      let (i,j) = List.nth ms k in 
 	Mv (i,j)
+
+
+
 
 let count board color =
   let s = ref 0 in
