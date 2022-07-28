@@ -175,7 +175,7 @@ let eval_fixed_stones board color =
 
 
 (* let eval_fixed_stones board color =  *)
-   
+
 
 let w_bp = 2.0
 let w_cn = 1.0
@@ -188,15 +188,40 @@ let eval_board board color =
   let fs = w_fs *. eval_fixed_stones board color  in 
   bp +. cn +. fs 
 
+let rec negamax board color depth passed = 
+  let ocolor = opposite_color color in 
+  if depth = 0 then eval_board board color 
+  else
+     let ms = valid_moves board color in 
+     if ms = [] then 
+        if passed then eval_board board color 
+        else (-1.0) *. negamax board ocolor depth true
+     else 
+      let rec find_max xs max_score = 
+        match xs with
+        | [] -> max_score
+        | (i,j)::ys -> 
+           let next_board = doMove board (Mv (i,j)) color  
+        in let score = (-1.0) *. negamax next_board ocolor (depth - 1) false
+        in if max_score < score then 
+             find_max ys score
+            else find_max ys max_score
+      in 
+        find_max ms (-10000000000.0)
+
+
+      
+
 
 let play board color =
+  let ocolor = opposite_color color in 
   let ms = valid_moves board color in
   (* print_moves ms; *)
     if ms = [] then
       Pass
     else
       let next_boards = List.map (fun (i,j) -> doMove board (Mv (i,j)) color) ms in 
-      let next_values = List.map (fun board -> eval_board board color) next_boards in
+      let next_values = List.map (fun board -> (-1.0) *. negamax board ocolor 3 false) next_boards in
       let k = argmax next_values in 
       let (i,j) = List.nth ms k in 
 	Mv (i,j)
