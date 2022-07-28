@@ -83,7 +83,7 @@ let valid_moves board color =
   List.filter (is_valid_move board color)
     (mix ls ls)
 
-let eval_board board color = 
+let eval_board_position board color = 
   let ocolor = opposite_color color in
   let rec eval i sum = 
     if i = 100 then 
@@ -91,12 +91,12 @@ let eval_board board color =
     else 
       let cl = board.(i/10).(i mod 10) in
       if cl = color then 
-        eval (i+1) (sum + board_value.(i/10).(i mod 10))
+        eval (i+1) (sum +. 3.0 *.(Random.float 1.0) *. float_of_int board_value.(i/10).(i mod 10))
       else if cl = ocolor then
-        eval (i+1) (sum - board_value.(i/10).(i mod 10))
+        eval (i+1) (sum -. 3.0 *.(Random.float 1.0) *. float_of_int board_value.(i/10).(i mod 10))
       else eval (i+1) sum 
   in
-    eval 0 0
+    eval 0 0.0
 
 let argmax xs = 
   let rec inner_argmax a max_index index max_value =
@@ -108,16 +108,90 @@ let argmax xs =
                  inner_argmax xs max_index (index+1) max_value
     
   in 
-     inner_argmax xs 0 0 (-100000)
+     inner_argmax xs 0 0 (-10000.0)
 
 let rec print_moves ms =
   match ms with
   | [] -> print_newline ()
   | (i,j)::xs -> print_string "("; print_int i; print_string ","; print_int j; print_string ")"; print_newline (); print_moves xs  
 
+
+let candidate_number board color = 
+  let ms = valid_moves board color in
+  List.length ms
+
+(* 候補手の評価 *)
+let eval_candidate_number board color = 
+   let ocolor = opposite_color color in
+   let value = (-1.0) *. (float_of_int (candidate_number board ocolor) +. (Random.float 1.0) *. 2.0 ) *. 10.0
+     in value
+
+
+(* 確定石の計算 *)
+let fixed_stones line color =
+   let rec none_exists xs =
+     match xs with
+     | [] -> false
+     | y::ys -> if y = none then true else none_exists ys 
+   in 
+     if none_exists (Array.to_list line) then 
+        let count xs color =
+          let rec streak xs color sum = 
+            match xs with
+            | [] -> sum
+            | y::ys -> if y = color then streak ys color (sum+1) else sum
+          in 
+            let streaks = streak (Array.to_list xs) color 0 
+          in 
+            if streaks = 8 then streaks else streaks + streak (List.rev (Array.to_list xs)) color 0
+        in 
+          count (Array.sub line 1 8) color
+     else
+       let rec count xs color sum = 
+          match xs with
+          | [] -> sum
+          | y::ys -> if y = color then count ys color (sum+1) else count ys color sum
+       in count (Array.to_list line) color 0
+
+let get_column matrix n = 
+  matrix.(n)
+
+let get_row matrix n = 
+  Array.map (fun row -> row.(n)) matrix 
+let eval_fixed_stones board color = 
+  let ocolor = opposite_color color in 
+  let left = get_column board 1 in 
+  let right = get_column board 8 in 
+  let upper = get_row board 1 in 
+  let bottom = get_row board 8 in
+  let left_fs =  (fixed_stones left color) - (fixed_stones left ocolor)  in 
+  let right_fs =  (fixed_stones right color) - (fixed_stones right ocolor)  in 
+  let upper_fs =  (fixed_stones upper color) - (fixed_stones upper ocolor) in 
+  let bottom_fs =  (fixed_stones bottom color) - (fixed_stones bottom ocolor) in 
+  (float_of_int (left_fs + right_fs + upper_fs + bottom_fs) +. (Random.float 1.0) *. 3.0) *. 11.0
+
+
+
+
+
+(* let eval_fixed_stones board color =  *)
+   
+
+let w_bp = 2.0
+let w_cn = 1.0
+
+let w_fs = 5.0
+
+let eval_board board color = 
+  let bp = w_bp *. eval_board_position board color in 
+  let cn = w_cn *. eval_candidate_number board color in 
+  let fs = w_fs *. eval_fixed_stones board color  in 
+  bp +. cn +. fs 
+
+
 let play board color =
   let ms = valid_moves board color in
-  print_moves ms;
+  (* print_moves ms; *)
     if ms = [] then
       Pass
     else
