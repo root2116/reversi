@@ -112,7 +112,7 @@ and op_move (ic,oc) board color hist oname mytime =
       let board = doMove board omove (opposite_color color) in
       let _ = if !opt_verbose then
           (print_endline "--------------------------------------------------------------------------------";
-           print_endline ("OMove: " ^ string_of_move omove ^ " " ^ string_of_color color);
+           print_endline ("OMove: " ^ string_of_move omove ^ " " ^ string_of_color (opposite_color color));
            print_board board) in
       my_move (ic,oc) board color (OMove omove :: hist) oname mytime
     | End (wl,n,m,r) ->

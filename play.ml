@@ -224,7 +224,30 @@ let rec negamax board color depth passed =
         find_max ms (-10000000000.0)
 
 
- 
+let rec alpha_beta board color alpha beta depth passed = 
+  let ocolor = opposite_color color in 
+  if depth = 0 then eval_board board color 
+  else 
+    let ms = valid_moves board color in 
+    if ms = [] then 
+      if passed then eval_board board color 
+      else (-1.0) *. alpha_beta board ocolor ((-1.0)*.beta) ((-1.0)*.alpha) depth true
+    else 
+      let rec find_max xs max_score = 
+        match xs with
+        | [] -> max_score
+        | (i,j)::ys -> 
+           let next_board = doMove board (Mv (i,j)) color 
+        in let score = (-1.0) *. alpha_beta next_board ocolor ((-1.0)*.beta) ((-1.0)*.alpha) (depth - 1) false 
+        in if score > alpha then 
+              if score >= beta then score
+              else find_max ys score
+          else 
+             find_max ys max_score
+     in find_max ms (-10000000.0)
+
+
+
 
 
 let count board color =
@@ -261,18 +284,18 @@ let rec complete_analysis board my_color color passed =
         if res = 1 then 1 
         else if res = 0 then my_turn_check ys false
         else my_turn_check ys lose 
-    in let rec op_turn_check xs = 
+    in let rec op_turn_check xs win = 
       match xs with
-      | [] -> 1
+      | [] -> if win then 1 else 0
       | (i,j)::ys -> 
          let new_board = doMove board (Mv (i,j)) color in 
          let res = complete_analysis new_board my_color ocolor false in 
-         if res = 1 then op_turn_check ys 
+         if res = 1 then op_turn_check ys win
          else if res = -1 then -1 
-         else 0
+         else op_turn_check ys false
     in 
       if color = my_color then my_turn_check ms true 
-      else op_turn_check ms
+      else op_turn_check ms true
 
   
 
@@ -317,7 +340,7 @@ let play board color =
         let (i,j) = List.nth ms max_index in 
         Mv (i,j)
       else 
-        let next_values = List.map (fun board -> (-1.0) *. negamax board ocolor 3 false) next_boards in
+        let next_values = List.map (fun board -> (-1.0) *. negamax board ocolor 5 false) next_boards in
         let k = argmax next_values in 
         let (i,j) = List.nth ms k in 
 	      Mv (i,j)
