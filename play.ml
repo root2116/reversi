@@ -233,18 +233,18 @@ let rec alpha_beta board color alpha beta depth passed =
       if passed then eval_board board color 
       else (-1.0) *. alpha_beta board ocolor ((-1.0)*.beta) ((-1.0)*.alpha) depth true
     else 
-      let rec find_max xs max_score = 
+      let rec find_max xs alpha max_score = 
         match xs with
         | [] -> max_score
         | (i,j)::ys -> 
            let next_board = doMove board (Mv (i,j)) color 
         in let score = (-1.0) *. alpha_beta next_board ocolor ((-1.0)*.beta) ((-1.0)*.alpha) (depth - 1) false 
-        in if score > alpha then 
-              if score >= beta then score
-              else find_max ys score
-          else 
-             find_max ys max_score
-     in find_max ms (-10000000.0)
+        in if score >= beta then score
+        else if score > alpha then 
+            if score > max_score then find_max ys score score
+            else find_max ys score max_score
+        else find_max ys alpha max_score
+     in find_max ms alpha (-10000000.0)
 
 
 
@@ -307,7 +307,7 @@ let rest board =
   let white_num = count board white in 
   64 - (black_num + white_num)
 
-let play board color =
+(* let play board color =
   let ocolor = opposite_color color in 
   let ms = valid_moves board color in
   (* print_moves ms; *)
@@ -342,6 +342,55 @@ let play board color =
       else 
         let next_values = List.map (fun board -> (-1.0) *. negamax board ocolor 5 false) next_boards in
         let k = argmax next_values in 
+        let (i,j) = List.nth ms k in 
+	      Mv (i,j) *)
+
+
+let play board color =
+  let ocolor = opposite_color color in 
+  let ms = valid_moves board color in
+  (* print_moves ms; *)
+    if ms = [] then
+      Pass
+    else
+      let next_boards = List.map (fun (i,j) -> doMove board (Mv (i,j)) color) ms in 
+      if rest board <= 12 then 
+        
+        let next_judge = List.map (fun board -> complete_analysis board color ocolor false) next_boards in 
+        print_string "next_judge: ";
+        List.iter (Printf.printf "%d ") next_judge;
+        print_string "\n";
+        let ks = argsmax next_judge in 
+        print_string "ks: ";
+        List.iter (Printf.printf "%d ") ks;
+        print_string "\n";
+        let rec find_max xs max_index max = 
+          match xs with
+          | [] -> max_index
+          | y::ys -> let next_board = List.nth next_boards y in 
+                     let score = (-1.0) *. negamax next_board ocolor 3 false in 
+                     if score > max then find_max ys y score 
+                     else find_max ys max_index max 
+        in
+        let max_index = find_max ks 0 (-10000000.0) in
+        print_string "max_index: ";
+        Printf.printf "%d" max_index;
+        print_string "\n"; 
+        let (i,j) = List.nth ms max_index in 
+        Mv (i,j)
+      else 
+
+        let rec find_max xs alpha index max_index = 
+          match xs with
+          | [] -> max_index
+          | (i,j)::ys -> 
+              let next_board = doMove board (Mv (i,j)) color in 
+              let score = (-1.0) *. alpha_beta next_board ocolor (-100000000.0) ((-1.0)*.alpha) 6 false in 
+              if score > alpha then find_max ys score (index+1) index
+              else find_max ys alpha (index+1) max_index
+          in
+          
+        let k = find_max ms (-1000000000.0) 0 0 in
         let (i,j) = List.nth ms k in 
 	      Mv (i,j)
 
