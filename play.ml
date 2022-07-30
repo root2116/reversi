@@ -110,6 +110,20 @@ let argmax xs =
   in 
      inner_argmax xs 0 0 (-10000.0)
 
+let argsmax xs = 
+  let rec inner_argsmax a max_idxs index max_value = 
+    match a with
+    | [] -> max_idxs
+    | x::xs -> if x > max_value then 
+                  inner_argsmax xs (index::[]) (index+1) x 
+               else if x = max_value then 
+                   inner_argsmax xs (index::max_idxs) (index+1) max_value 
+               else
+                  inner_argsmax xs max_idxs (index+1) max_value
+  in
+     inner_argsmax xs [] 0 (-1000000)
+
+
 let rec print_moves ms =
   match ms with
   | [] -> print_newline ()
@@ -210,23 +224,7 @@ let rec negamax board color depth passed =
         find_max ms (-10000000000.0)
 
 
-      
-
-
-let play board color =
-  let ocolor = opposite_color color in 
-  let ms = valid_moves board color in
-  (* print_moves ms; *)
-    if ms = [] then
-      Pass
-    else
-      let next_boards = List.map (fun (i,j) -> doMove board (Mv (i,j)) color) ms in 
-      let next_values = List.map (fun board -> (-1.0) *. negamax board ocolor 3 false) next_boards in
-      let k = argmax next_values in 
-      let (i,j) = List.nth ms k in 
-	Mv (i,j)
-
-
+ 
 
 
 let count board color =
@@ -237,6 +235,106 @@ let count board color =
       done
     done;
     !s
+
+let judge board color = 
+  let ocolor = opposite_color color in 
+  let color_n = count board color in 
+  let ocolor_n = count board ocolor in 
+  if color_n > ocolor_n then 1 
+  else if color_n < ocolor_n then -1 
+  else 0
+     
+
+let rec complete_analysis board my_color color passed = 
+  let ocolor = opposite_color color in
+  let ms = valid_moves board color in 
+  if ms = [] then 
+    if passed then judge board my_color 
+    else complete_analysis board my_color ocolor true
+  else 
+    let rec my_turn_check xs lose = 
+      match xs with
+      | [] -> if lose then -1 else 0
+      | (i,j)::ys -> 
+        let new_board = doMove board (Mv (i,j)) color in 
+        let res = complete_analysis new_board my_color ocolor false in 
+        if res = 1 then 1 
+        else if res = 0 then my_turn_check ys false
+        else my_turn_check ys lose 
+    in let rec op_turn_check xs = 
+      match xs with
+      | [] -> 1
+      | (i,j)::ys -> 
+         let new_board = doMove board (Mv (i,j)) color in 
+         let res = complete_analysis new_board my_color ocolor false in 
+         if res = 1 then op_turn_check ys 
+         else if res = -1 then -1 
+         else 0
+    in 
+      if color = my_color then my_turn_check ms true 
+      else op_turn_check ms
+
+  
+
+
+
+
+let rest board = 
+  let black_num = count board black in 
+  let white_num = count board white in 
+  64 - (black_num + white_num)
+
+let play board color =
+  let ocolor = opposite_color color in 
+  let ms = valid_moves board color in
+  (* print_moves ms; *)
+    if ms = [] then
+      Pass
+    else
+      let next_boards = List.map (fun (i,j) -> doMove board (Mv (i,j)) color) ms in 
+      if rest board <= 12 then 
+        
+        let next_judge = List.map (fun board -> complete_analysis board color ocolor false) next_boards in 
+        print_string "next_judge: ";
+        List.iter (Printf.printf "%d ") next_judge;
+        print_string "\n";
+        let ks = argsmax next_judge in 
+        print_string "ks: ";
+        List.iter (Printf.printf "%d ") ks;
+        print_string "\n";
+        let rec find_max xs max_index max = 
+          match xs with
+          | [] -> max_index
+          | y::ys -> let next_board = List.nth next_boards y in 
+                     let score = (-1.0) *. negamax next_board ocolor 3 false in 
+                     if score > max then find_max ys y score 
+                     else find_max ys max_index max 
+        in
+        let max_index = find_max ks 0 (-10000000.0) in
+        print_string "max_index: ";
+        Printf.printf "%d" max_index;
+        print_string "\n"; 
+        let (i,j) = List.nth ms max_index in 
+        Mv (i,j)
+      else 
+        let next_values = List.map (fun board -> (-1.0) *. negamax board ocolor 3 false) next_boards in
+        let k = argmax next_values in 
+        let (i,j) = List.nth ms k in 
+	      Mv (i,j)
+
+(* let play board color = 
+  let _ = board in 
+  let _ = color in 
+  let input = read_line () in 
+  let x_ch = input.[0] in 
+  let y_ch = input.[1] in
+  let x = int_of_char x_ch - int_of_char 'A' + 1 in 
+  let y = int_of_char y_ch - int_of_char '1' + 1 in 
+   Mv (x,y)
+
+ *)
+
+
 
 
 let print_board board =
