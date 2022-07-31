@@ -285,9 +285,26 @@ let judge board color =
   else if color_n < ocolor_n then -1 
   else 0
      
+let string_of_board board color = 
+    let b_str = ref (string_of_int color) in 
+    for i=0 to 9 do 
+      for j=0 to 9 do 
+        if board.(i).(j) = white then 
+          b_str := !b_str ^ "1" ^ string_of_move (Mv (i,j))
+        else if board.(i).(j) = black then 
+          b_str := !b_str ^ "2" ^ string_of_move (Mv (i,j))
+        else ()
+      done
+    done;
+    !b_str
 
+let hash : (string,int) Hashtbl.t = Hashtbl.create 10000 
 
 let rec complete_analysis board my_color color passed = 
+  try 
+    let mem = Hashtbl.find hash (string_of_board board color) in 
+    mem
+   with Not_found ->   
   let ocolor = opposite_color color in
   let ms = valid_moves board color in 
   if ms = [] then 
@@ -313,8 +330,14 @@ let rec complete_analysis board my_color color passed =
          else if res = -1 then -1 
          else op_turn_check ys false
     in 
-      if color = my_color then my_turn_check ms true 
-      else op_turn_check ms true
+      if color = my_color then
+         let res =  my_turn_check ms true in 
+         let _ = Hashtbl.add hash (string_of_board board color) res in 
+         res
+      else 
+        let res = op_turn_check ms true in 
+        let _ = Hashtbl.add hash (string_of_board board color) res in
+        res
 
   
 
@@ -377,6 +400,8 @@ let convert (i,j) =
   else (9-j,9-i) 
 
 let choose_standard (i,j) = 
+
+  
   let (i',j') = convert (i,j) in
   let move_str = string_of_move (Mv (i',j')) in 
   let count_table = Array.make_matrix 10 10 0 in
@@ -395,23 +420,27 @@ let choose_standard (i,j) =
       else 
          filter rest res prefix
   in
-    standard := filter !standard [] move_str;
-    if !standard = [] then 
-      None
-    else
-    let max = ref 0 in 
-    let max_index = ref (0,0) in 
-    for i=0 to 9 do 
-      for j=0 to 9 do 
-        if !max < count_table.(i).(j) then 
-          let _ = max := count_table.(i).(j) in 
-          max_index := (i,j) 
-      done
-    done;
-    let (x,y) = !max_index in
-    let (x',y') = convert (x,y) in
-    standard := filter !standard [] (string_of_move (Mv (x,y)));
-     Some (Mv (x',y'))
+    if i = 0 && j = 0 then 
+      let _ = standard := filter !standard [] "F5" in
+      Some (Mv (6,5))
+    else 
+      let _ = standard := filter !standard [] move_str in
+      if !standard = [] then 
+        None
+      else
+      let max = ref 0 in 
+      let max_index = ref (0,0) in 
+      for i=0 to 9 do 
+        for j=0 to 9 do 
+          if !max < count_table.(i).(j) then 
+            let _ = max := count_table.(i).(j) in 
+            max_index := (i,j) 
+        done
+      done;
+      let (x,y) = !max_index in
+      let (x',y') = convert (x,y) in
+      let _ = standard := filter !standard [] (string_of_move (Mv (x,y))) in
+      Some (Mv (x',y'))
 
       
        
@@ -422,8 +451,8 @@ let turn board =
   black_n + white_n - 4
 
 
-let set_mode board = 
-    if turn board = 1 then 
+let set_mode board color = 
+    if turn board = 1 && color = white then 
       if !opposite_move = (6,5) then mode := f5 
       else if !opposite_move = (5,6) then mode := e6 
       else if !opposite_move = (3,4) then mode := c4 
@@ -431,7 +460,7 @@ let set_mode board =
     else ()
 
 
-    
+exception Error 
 let play board color =
   let ocolor = opposite_color color in 
   let rec find_max xs alpha index max_index = 
@@ -439,7 +468,7 @@ let play board color =
           | [] -> max_index
           | (i,j)::ys -> 
               let next_board = doMove board (Mv (i,j)) color in 
-              let score = (-1.0) *. alpha_beta next_board ocolor (-100000000.0) ((-1.0)*.alpha) 6 false in 
+              let score = (-1.0) *. alpha_beta next_board ocolor (-100000000.0) ((-1.0)*.alpha) 7 false in 
               if score > alpha then find_max ys score (index+1) index
               else find_max ys alpha (index+1) max_index
   in
@@ -448,15 +477,28 @@ let play board color =
       Pass
     else
       if turn board = 0 then 
-        Mv (6,5) (* 自分が先手ならF5から始める *)
+        match choose_standard (0,0) with (* 自分が先手ならF5から始める *)
+          | Some v ->  v 
+          | None -> raise Error
       else if turn board < 20 then 
-        let _ = set_mode board in (* 1ターン目でモードを設定 *)
+        let _ = set_mode board color in (* 1ターン目でモードを設定 *)
+        print_string "opposite_move :";
+        let (a,b) = !opposite_move in
+        Printf.printf "(%d,%d)\n" a b;
         (match choose_standard !opposite_move with 
-         | None ->  let k = find_max ms (-1000000000.0) 0 0 in
+         | None ->  print_string "eval \n" ;
+                    let k = find_max ms (-1000000000.0) 0 0 in
                     let (i,j) = List.nth ms k in 
                     Mv (i,j)
-         | Some v -> v)
-      else if rest board <= 12 then 
+         | Some (Mv (i,j)) -> print_string "standard \n" ; 
+          if List.exists (fun (x,y) -> x = i && y = j) ms then 
+             (Mv (i,j))
+          else  let k = find_max ms (-1000000000.0) 0 0 in
+                    let (i,j) = List.nth ms k in 
+                    Mv (i,j)
+          | _ -> raise Error 
+         )
+      else if rest board <= 15 then 
         let next_boards = List.map (fun (i,j) -> doMove board (Mv (i,j)) color) ms in 
         let next_judge = List.map (fun board -> complete_analysis board color ocolor false) next_boards in 
         print_string "next_judge: ";

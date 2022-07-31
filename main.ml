@@ -82,6 +82,8 @@ let rec wait_start (ic,oc) =
       Bye scores ->
         print_scores scores
     | Start (color, oname, mytime) ->
+      let _ = standard := standard_moves in 
+      let _ = Hashtbl.clear hash in 
       let board = init_board () in
       if color = black then
         my_move (ic,oc) board color [] oname mytime
