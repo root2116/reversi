@@ -114,6 +114,7 @@ and op_move (ic,oc) board color hist oname mytime =
           (print_endline "--------------------------------------------------------------------------------";
            print_endline ("OMove: " ^ string_of_move omove ^ " " ^ string_of_color (opposite_color color));
            print_board board) in
+      set_opposite omove;
       my_move (ic,oc) board color (OMove omove :: hist) oname mytime
     | End (wl,n,m,r) ->
       proc_end (ic,oc) board color hist oname wl n m r
